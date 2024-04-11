@@ -1,0 +1,19 @@
+model:
+  activation: SiLU
+  architecture: AE
+  channels: 1
+  features: [64, 128, 256]
+  groupnorm: 16
+  latent: 4
+  resnet: 1
+optimiser:
+  betas: [.9, .999]
+training:
+  batch: 128
+  dataset: MNIST
+  epochs: 10
+  lr: 1e-3
+wandb:
+  logfreq: 1
+  plotfreq: 1
+
