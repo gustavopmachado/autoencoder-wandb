@@ -13,7 +13,7 @@ from torchvision import datasets, transforms
 __all__ = ["data", "visualise"]
 
 
-def data(dataset, batch, output="loader"):
+def data(dataset, batch, ratio=1, output="loader"):
     """Generate the data for training.
 
     Parameters
@@ -23,6 +23,9 @@ def data(dataset, batch, output="loader"):
 
     batch : int
         Batch size
+
+    ratio : float, default=0.1
+        Percentage of the original dataset to be used
 
     output : str, default="loader"
         Controls the output. If 'loader' only outputs the training and validation
@@ -53,6 +56,12 @@ def data(dataset, batch, output="loader"):
                                        transform=transform)
         valid_dataset = datasets.MNIST(root='./data', train=False, download=True,
                                        transform=transform)
+
+    # train_indices = torch.randint(0, len(train_dataset), (int(ratio * len(train_dataset)),))
+    # valid_indices = torch.randint(0, len(valid_dataset), (int(ratio * len(valid_dataset)),))
+
+    # train_subset = torch.utils.data.Subset(train_dataset, train_indices)
+    # valid_subset = torch.utils.data.Subset(valid_dataset, valid_indices)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch, shuffle=True)

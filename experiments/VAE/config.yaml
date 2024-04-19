@@ -1,0 +1,15 @@
+model:
+  activation: SiLU
+  features: [512, 256]
+  latent: 2
+optimiser:
+  betas: [.9, .999]
+training:
+  batch: 256
+  epochs: 100
+  eta: 5.0e-4
+  lr: 1.0e-3
+wandb:
+  logfreq: 1
+  plotfreq: 10
+

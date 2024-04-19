@@ -2,7 +2,7 @@
 
 from setuptools import setup, find_packages
 
-exclude = ['data', 'info', 'reports', 'scripts']
+exclude = ['data', 'experiments', 'notebooks', 'scripts', 'venv', 'wandb']
 
 setup(name='lbgdl',
       version="0.0.1",

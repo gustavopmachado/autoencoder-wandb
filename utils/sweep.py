@@ -1,8 +1,9 @@
 """Script for training"""
 
-# pylint: disable=import-error, no-name-in-module, redefined-outer-name, consider-using-f-string
+# pylint: disable=import-error, no-name-in-module, consider-using-f-string, redefined-outer-name
 
 import os
+from functools import partial
 
 import torch
 import yaml
@@ -14,7 +15,7 @@ from utils.settings import ddp
 from utils.training import AAETrainer, AETrainer, VAETrainer
 
 
-def run(hyperparameters):
+def run(config):
     """Perform the training of a model and logged via wandb.
     A dictionary is used as a single argument for wandb, however its
     keys and respective descriptions are listed below as paramters.
@@ -25,9 +26,6 @@ def run(hyperparameters):
         Activation function. Available is "LeakyReLU", "ReLU",
         "Tanh", "Mish" and "Sigmoid"
 
-    architecture : str
-        Architecture to be used in the model. Values are AE, VAE
-
     batch : int
         Batch size
 
@@ -35,7 +33,7 @@ def run(hyperparameters):
         Adam's betas
 
     dataset : str
-        Name of the dataset in data/
+        Name of the datafolder in data/
 
     epochs : int
         Training epochs
@@ -43,7 +41,7 @@ def run(hyperparameters):
     eta : float, optional
         Kullback–Leibler divergence regularization factor
 
-    features : List[int]
+    features : int
         List of features to be generated throughout the compressive layers
 
     latent : int, optional
@@ -55,20 +53,13 @@ def run(hyperparameters):
     pixels : int
         Number of pixels in the input image
 
-    Returns
-    -------
-        Trained model
-
     """
     # Initialise DDP
     if torch.distributed.is_available() and torch.distributed.is_initialized():
         ddp()
 
     # Initialise wandb for logging
-    args = {"project": "autoencoder-wandb", "config": hyperparameters}
-    if torch.distributed.is_available() and torch.distributed.is_initialized():
-        args.update({"name": "GPU: " + str(int(os.environ["LOCAL_RANK"]))})
-    with wandb.init(**args):
+    with wandb.init(config=config):
         config = wandb.config
 
         # Set up training
@@ -83,15 +74,12 @@ def run(hyperparameters):
             trainer = AAETrainer(encoder, decoder, discriminator, **config)
         else:
             raise ValueError("Training not implemented for {}".format(config.get("architecture")))
-
         # Traning
         model = trainer.run()
 
     # DDP tear down
     if torch.distributed.is_available() and torch.distributed.is_initialized():
         destroy_process_group()
-
-    return model
 
 
 if __name__ == "__main__":
@@ -103,8 +91,23 @@ if __name__ == "__main__":
     parser.add_argument('--architecture', type=str,
                         help='architecture to be used in the model',
                         required=True)
+    parser.add_argument("--betas", nargs="+", type=float,
+                        help='adam momentum parameters',
+                        required=True)
+    parser.add_argument('--count', type=int,
+                        help='number of sweep config trials to try',
+                        required=True)
     parser.add_argument('--dataset', type=str,
                         help='name of the dataset in data/',
+                        required=True)
+    parser.add_argument('--epochs', type=int,
+                        help='training epochs',
+                        required=True)
+    parser.add_argument('--latent', type=int,
+                        help='number of features in the latent space',
+                        required=True)
+    parser.add_argument('--logfreq', type=int,
+                        help='frequency to log with wandb',
                         required=True)
     parser.add_argument('--pixels', type=int, default=784,
                         help='total number of pixels per image')
@@ -113,19 +116,27 @@ if __name__ == "__main__":
     # Training settings
     settings = dict(
         architecture=args.architecture,
+        betas=args.betas,
         dataset=args.dataset,
-        pixels=args.pixels
+        epochs=args.epochs,
+        latent=args.latent,
+        logfreq=args.logfreq,
+        pixels=args.pixels,
+        plotfreq=-1,
     )
 
-    # Load harameters for training
+    # Load hyperparameters for sweep
     root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    path = os.path.join(root, "experiments", settings.get("architecture"), "config.yaml")
+    path = os.path.join(root, "experiments", settings.get("architecture"), "sweep.yml")
     with open(path, encoding="utf-8") as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    hyperparameters = {}
-    for block in config.values():
-        hyperparameters.update(**block)
+        hyperparameters = yaml.load(f, Loader=yaml.FullLoader)
+
+    # Set up the sweep
+    sweepid = wandb.sweep(hyperparameters, project="autoencoder-wandb")
+
+    # Guarantees a cleaner sweep's UI
     hyperparameters.update(settings)
 
-    # Training
-    model = run(hyperparameters)
+    # Run the sweep
+    wandb.agent(sweepid, function=partial(run, hyperparameters),
+                count=args.count)

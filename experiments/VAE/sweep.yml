@@ -1,0 +1,36 @@
+program: sweep.py
+method: bayes
+name: VAE
+metric:
+  name: Validation Loss
+  goal: minimize
+parameters:
+  activation:
+    values: ["ReLU", "SiLU"]
+  batch: 
+    values: [128, 256]
+  features:
+    values:
+      - [512, 512, 256, 256]
+      - [512, 512, 256, 128]
+      - [512, 256, 128, 64]
+      - [512, 512, 256]
+      - [512, 256, 256]
+      - [512, 256, 128]
+      - [512, 256]
+  lr:
+    values: [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6]
+  eta:
+    values: [1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6]
+early_terminate:
+  type: hyperband
+  min_iter: 10
+  eta: 5
+command:
+    - ${env}
+    - torchrun
+    - "--standalone"
+    - "--nnodes=1"
+    - "--nproc_per_node=1"
+    - ${program}
+    - ${args}
